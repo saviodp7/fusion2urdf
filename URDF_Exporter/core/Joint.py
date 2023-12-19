@@ -10,12 +10,14 @@ from xml.etree.ElementTree import Element, SubElement
 from ..utils import utils
 
 class Joint:
-    def __init__(self, name, xyz, axis, parent, child, joint_type, upper_limit, lower_limit):
+    def __init__(self, name, robot_name, xyz, axis, parent, child, joint_type, upper_limit, lower_limit):
         """
         Attributes
         ----------
         name: str
             name of the joint
+        name: str
+            name of the robot
         type: str
             type of the joint(ex: rev)
         xyz: [x, y, z]
@@ -32,6 +34,7 @@ class Joint:
             generated xml describing about the transmission
         """
         self.name = name
+        self.robot_name = robot_name
         self.type = joint_type
         self.xyz = xyz
         self.parent = parent
@@ -79,6 +82,9 @@ class Joint:
         
         tran = Element('transmission')
         tran.attrib = {'name':self.name + '_tran'}
+
+        robot_namespace = SubElement(tran, 'robotNamespace')
+        robot_namespace.text = '/{}'.format(self.robot_name)
         
         joint_type = SubElement(tran, 'type')
         joint_type.text = 'transmission_interface/SimpleTransmission'
@@ -86,12 +92,12 @@ class Joint:
         joint = SubElement(tran, 'joint')
         joint.attrib = {'name':self.name}
         hardwareInterface_joint = SubElement(joint, 'hardwareInterface')
-        hardwareInterface_joint.text = 'hardware_interface/EffortJointInterface'
+        hardwareInterface_joint.text = 'hardware_interface/$(arg hardware_interface)'
         
         actuator = SubElement(tran, 'actuator')
         actuator.attrib = {'name':self.name + '_actr'}
         hardwareInterface_actr = SubElement(actuator, 'hardwareInterface')
-        hardwareInterface_actr.text = 'hardware_interface/EffortJointInterface'
+        hardwareInterface_actr.text = 'hardware_interface/$(arg hardware_interface)'
         mechanicalReduction = SubElement(actuator, 'mechanicalReduction')
         mechanicalReduction.text = '1'
         
@@ -172,8 +178,8 @@ def make_joints_dict(root, msg):
         if joint.occurrenceTwo.component.name == 'base_link':
             joint_dict['parent'] = 'base_link'
         else:
-            joint_dict['parent'] = re.sub('[ :()]', '_', joint.occurrenceTwo.name)
-        joint_dict['child'] = re.sub('[ :()]', '_', joint.occurrenceOne.name)
+            joint_dict['parent'] = str(re.sub('[ :()]', '_', joint.occurrenceTwo.name)[:-2])
+        joint_dict['child'] = str(re.sub('[ :()]', '_', joint.occurrenceOne.name)[:-2])
         
         
         #There seem to be a problem with geometryOrOriginTwo. To calcualte the correct orogin of the generated stl files following approach was used.

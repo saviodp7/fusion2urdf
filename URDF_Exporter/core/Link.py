@@ -107,7 +107,7 @@ def make_inertial_dict(root, msg):
         occs_dict = {}
         prop = occs.getPhysicalProperties(adsk.fusion.CalculationAccuracy.VeryHighCalculationAccuracy)
         
-        occs_dict['name'] = re.sub('[ :()]', '_', occs.name)
+        occs_dict['name'] = str(re.sub('[ :()]', '_', occs.name)[:-2])
 
         mass = prop.mass  # kg
         occs_dict['mass'] = mass
@@ -122,6 +122,6 @@ def make_inertial_dict(root, msg):
         if occs.component.name == 'base_link':
             inertial_dict['base_link'] = occs_dict
         else:
-            inertial_dict[re.sub('[ :()]', '_', occs.name)] = occs_dict
+            inertial_dict[str(re.sub('[ :()]', '_', occs.name)[:-2])] = occs_dict
 
     return inertial_dict, msg

@@ -50,17 +50,18 @@ def write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict)
             name = joints_dict[joint]['child']
             center_of_mass = \
                 [ i-j for i, j in zip(inertial_dict[name]['center_of_mass'], joints_dict[joint]['xyz'])]
+
             link = Link.Link(name=name, xyz=joints_dict[joint]['xyz'],\
                 center_of_mass=center_of_mass,\
                 repo=repo, mass=inertial_dict[name]['mass'],\
                 inertia_tensor=inertial_dict[name]['inertia'])
-            links_xyz_dict[link.name] = link.xyz            
+            links_xyz_dict[link.name] = link.xyz
             link.make_link_xml()
             f.write(link.link_xml)
             f.write('\n')
 
 
-def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name):
+def write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name, robot_name):
     """
     Write joints and transmission information into urdf "repo/file_name"
     
@@ -96,7 +97,7 @@ to swap component1<=>component2"
                 % (parent, child, parent, child), "Error!")
                 quit()
                 
-            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, \
+            joint = Joint.Joint(name=j, robot_name = robot_name, joint_type = joint_type, xyz=xyz, \
             axis=joints_dict[j]['axis'], parent=parent, child=child, \
             upper_limit=upper_limit, lower_limit=lower_limit)
             joint.make_joint_xml()
@@ -128,15 +129,19 @@ def write_urdf(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_n
         f.write('<?xml version="1.0" ?>\n')
         f.write('<robot name="{}" xmlns:xacro="http://www.ros.org/wiki/xacro">\n'.format(robot_name))
         f.write('\n')
-        f.write('<xacro:include filename="$(find {})/urdf/materials.xacro" />'.format(package_name))
+        f.write('<xacro:include filename="$(find {})/urdf/materials.xacro" />\n'.format(package_name))
+        f.write('<xacro:include filename="$(find {})/urdf/{}.trans" />\n'.format(package_name, robot_name))
+        f.write('<xacro:include filename="$(find {})/urdf/{}.gazebo" />\n'.format(package_name, robot_name))
         f.write('\n')
-        f.write('<xacro:include filename="$(find {})/urdf/{}.trans" />'.format(package_name, robot_name))
-        f.write('\n')
-        f.write('<xacro:include filename="$(find {})/urdf/{}.gazebo" />'.format(package_name, robot_name))
+        f.write('<link name="world"/>\n')
+        f.write('<joint name="world_to_base_link=" type="fixed">\n')
+        f.write('  <parent link="world"/>\n')
+        f.write('  <child link="base_link"/>\n')
+        f.write('</joint>\n')
         f.write('\n')
 
     write_link_urdf(joints_dict, repo, links_xyz_dict, file_name, inertial_dict)
-    write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name)
+    write_joint_urdf(joints_dict, repo, links_xyz_dict, file_name, robot_name)
     write_gazebo_endtag(file_name)
 
 def write_materials_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name, robot_name, save_dir):
@@ -176,6 +181,8 @@ def write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, packag
         f.write('<?xml version="1.0" ?>\n')
         f.write('<robot name="{}" xmlns:xacro="http://www.ros.org/wiki/xacro" >\n'.format(robot_name))
         f.write('\n')
+        f.write('<xacro:arg name="hardware_interface" default="PositionJointInterface"/>')
+        f.write('\n')
 
         for j in joints_dict:
             parent = joints_dict[j]['parent']
@@ -195,7 +202,7 @@ to swap component1<=>component2"
                 % (parent, child, parent, child), "Error!")
                 quit()
                 
-            joint = Joint.Joint(name=j, joint_type = joint_type, xyz=xyz, \
+            joint = Joint.Joint(name=j, robot_name=robot_name, joint_type = joint_type, xyz=xyz, \
             axis=joints_dict[j]['axis'], parent=parent, child=child, \
             upper_limit=upper_limit, lower_limit=lower_limit)
             if joint_type != 'fixed':
@@ -221,12 +228,14 @@ def write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name,
 
         gazebo = Element('gazebo')
         plugin = SubElement(gazebo, 'plugin')
-        plugin.attrib = {'name':'control', 'filename':'libgazebo_ros_control.so'}
+        plugin.attrib = {'name':'gazebo_ros_control', 'filename':'libgazebo_ros_control.so'}
+        robotNamespace = SubElement(plugin, 'robotNamespace')
+        robotNamespace.text = "{}".format(robot_name)
         gazebo_xml = "\n".join(utils.prettify(gazebo).split("\n")[1:])
         f.write(gazebo_xml)
 
         # for base_link
-        f.write('<gazebo reference="base_link">\n')
+        f.write('\n<gazebo reference="base_link">\n')
         f.write('  <material>${body_color}</material>\n')
         f.write('  <mu1>0.2</mu1>\n')
         f.write('  <mu2>0.2</mu2>\n')
