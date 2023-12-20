@@ -63,8 +63,7 @@ class Joint:
             axis.attrib = {'xyz':' '.join([str(_) for _ in self.axis])}
         if self.type == 'revolute' or self.type == 'prismatic':
             limit = SubElement(joint, 'limit')
-            limit.attrib = {'upper': str(self.upper_limit), 'lower': str(self.lower_limit),
-                            'effort': '100', 'velocity': '100'}
+            limit.attrib = {'upper': str(self.upper_limit), 'lower': str(self.lower_limit)}
             
         self.joint_xml = "\n".join(utils.prettify(joint).split("\n")[1:])
 

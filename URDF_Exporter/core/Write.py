@@ -181,7 +181,7 @@ def write_transmissions_xacro(joints_dict, links_xyz_dict, inertial_dict, packag
         f.write('<?xml version="1.0" ?>\n')
         f.write('<robot name="{}" xmlns:xacro="http://www.ros.org/wiki/xacro" >\n'.format(robot_name))
         f.write('\n')
-        f.write('<xacro:arg name="hardware_interface" default="PositionJointInterface"/>')
+        f.write('<xacro:arg name="hardware_interface" default="PositionJointInterface"/>\n')
         f.write('\n')
 
         for j in joints_dict:
@@ -230,7 +230,7 @@ def write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name,
         plugin = SubElement(gazebo, 'plugin')
         plugin.attrib = {'name':'gazebo_ros_control', 'filename':'libgazebo_ros_control.so'}
         robotNamespace = SubElement(plugin, 'robotNamespace')
-        robotNamespace.text = "{}".format(robot_name)
+        robotNamespace.text = "/{}".format(robot_name)
         gazebo_xml = "\n".join(utils.prettify(gazebo).split("\n")[1:])
         f.write(gazebo_xml)
 
@@ -308,7 +308,6 @@ def write_gazebo_launch(package_name, robot_name, save_dir):
     """
     write gazebo launch file "save_dir/launch/gazebo.launch"
     
-    
     Parameter
     ---------
     robot_name: str
@@ -320,41 +319,51 @@ def write_gazebo_launch(package_name, robot_name, save_dir):
     try: os.mkdir(save_dir + '/launch')
     except: pass     
     
-    launch = Element('launch')
-    param = SubElement(launch, 'param')
-    param.attrib = {'name':'robot_description', 'command':'$(find xacro)/xacro $(find {})/urdf/{}.xacro'.format(package_name, robot_name)}
 
-    node = SubElement(launch, 'node')
-    node.attrib = {'name':'spawn_urdf', 'pkg':'gazebo_ros', 'type':'spawn_model',\
+    empty_world =  Element('include')
+    empty_world.attrib = {'file':'$(find gazebo_ros)/launch/empty_world.launch'}
+    arg = SubElement(empty_world, 'arg')
+    arg.attrib = {'name' : 'paused' , 'value' : 'false'}
+    arg = SubElement(empty_world, 'arg')
+    arg.attrib = {'name' : 'use_sim_time' , 'value' : 'true'}
+    arg = SubElement(empty_world, 'arg')
+    arg.attrib = {'name' : 'gui' , 'value' : 'true'}
+    arg = SubElement(empty_world, 'arg')
+    arg.attrib = {'name' : 'headless' , 'value' : 'false'}
+    arg = SubElement(empty_world, 'arg')
+    arg.attrib = {'name' : 'debug' , 'value' : 'false'}
+    
+    robot_description = Element('param')
+    robot_description.attrib = {'name':'robot_description', 'command':'$(find xacro)/xacro $(find {})/urdf/{}.xacro'.format(package_name, robot_name)}
+
+    urdf_spawner = Element('node')
+    urdf_spawner.attrib = {'name':'urdf_spawner', 'pkg':'gazebo_ros', 'type':'spawn_model', 'respawn':'false', 'output':'screen',\
                     'args':'-param robot_description -urdf -model {}'.format(robot_name)}
-
-    include_ =  SubElement(launch, 'include')
-    include_.attrib = {'file':'$(find gazebo_ros)/launch/empty_world.launch'}        
     
-    number_of_args = 5
-    args = [None for i in range(number_of_args)]
-    args_name_value_pairs = [['paused', 'true'], ['use_sim_time', 'true'],
-                             ['gui', 'true'], ['headless', 'false'], 
-                             ['debug', 'false']]
-                             
-    for i, arg in enumerate(args):
-        arg = SubElement(include_, 'arg')
-        arg.attrib = {'name' : args_name_value_pairs[i][0] , 
-        'value' : args_name_value_pairs[i][1]}
-
-
-    
-    launch_xml = "\n".join(utils.prettify(launch).split("\n")[1:])        
+    empty_world_xml = "\n".join(utils.prettify(empty_world).split("\n")[1:]) 
+    robot_description_xml = "\n".join(utils.prettify(robot_description).split("\n")[1:])
+    urdf_spawner_xml = "\n".join(utils.prettify(urdf_spawner).split("\n")[1:])       
     
     file_name = save_dir + '/launch/' + 'gazebo.launch'    
     with open(file_name, mode='w') as f:
-        f.write(launch_xml)
+        f.write('<?xml version="1.0" ?>\n')
+        f.write('<launch>\n')
+        f.write('\n')
+        f.write('<!-- Loads the environment in Gazebo. -->\n')
+        f.write(empty_world_xml)
+        f.write('\n')
+        f.write('<!-- Load the URDF with the given hardware interface into the ROS Parameter Server -->\n')
+        f.write(robot_description_xml)
+        f.write('\n')
+        f.write('<!-- Run a python script to send a service call to gazebo_ros to spawn a URDF robot -->\n')
+        f.write(urdf_spawner_xml)
+        f.write('\n')
+        f.write('</launch>')
 
 
 def write_control_launch(package_name, robot_name, save_dir, joints_dict):
     """
     write control launch file "save_dir/launch/controller.launch"
-    
     
     Parameter
     ---------
@@ -369,13 +378,9 @@ def write_control_launch(package_name, robot_name, save_dir, joints_dict):
     try: os.mkdir(save_dir + '/launch')
     except: pass     
     
-    #launch = Element('launch')
+    rosparam_loader = Element('rosparam')
+    rosparam_loader.attrib = {'file':'$(find {}_description)/config/controller.yaml'.format(robot_name), 'command':'load'}
 
-    controller_name = robot_name + '_controller'
-    #rosparam = SubElement(launch, 'rosparam')
-    #rosparam.attrib = {'file':'$(find {})/launch/controller.yaml'.format(package_name),
-    #                   'command':'load'}
-                       
     controller_args_str = ""
     for j in joints_dict:
         joint_type = joints_dict[j]['type']
@@ -395,26 +400,30 @@ def write_control_launch(package_name, robot_name, save_dir, joints_dict):
     remap.attrib = {'from':'/joint_states',\
                     'to':'/' + robot_name + '/joint_states'}
     
-    #launch_xml  = "\n".join(utils.prettify(launch).split("\n")[1:])   
-    launch_xml  = "\n".join(utils.prettify(node_controller).split("\n")[1:])   
-    launch_xml += "\n".join(utils.prettify(node_publisher).split("\n")[1:])   
+    rosparam_loader_xml  = "\n".join(utils.prettify(rosparam_loader).split("\n")[1:])   
+    controller_spawner_xml  = "\n".join(utils.prettify(node_controller).split("\n")[1:])   
+    robot_state_publisher_xml = "\n".join(utils.prettify(node_publisher).split("\n")[1:])   
 
     file_name = save_dir + '/launch/controller.launch'    
     with open(file_name, mode='w') as f:
+        f.write('<?xml version="1.0" ?>\n')
         f.write('<launch>\n')
         f.write('\n')
-        #for some reason ROS is very picky about the attribute ordering, so we'll bitbang this element
-        f.write('<rosparam file="$(find {})/launch/controller.yaml" command="load"/>'.format(package_name))
+        f.write('<!-- Loads joint controller configurations from YAML file to parameter server -->\n')
+        f.write(rosparam_loader_xml)
         f.write('\n')
-        f.write(launch_xml)
+        f.write('<!-- Loads the controllers -->\n')
+        f.write(controller_spawner_xml)
+        f.write('\n')
+        f.write('<!-- Converts joint states to TF transforms for rviz, etc -->\n')
+        f.write(robot_state_publisher_xml)
         f.write('\n')
         f.write('</launch>')
         
 
 def write_yaml(package_name, robot_name, save_dir, joints_dict):
     """
-    write yaml file "save_dir/launch/controller.yaml"
-    
+    write yaml file "save_dir/config/controller.yaml"
     
     Parameter
     ---------
@@ -425,25 +434,35 @@ def write_yaml(package_name, robot_name, save_dir, joints_dict):
     joints_dict: dict
         information of the joints
     """
-    try: os.mkdir(save_dir + '/launch')
+    try: os.mkdir(save_dir + '/config')
     except: pass 
 
-    controller_name = robot_name + '_controller'
-    file_name = save_dir + '/launch/controller.yaml'
+    file_name = save_dir + '/config/controller.yaml'
     with open(file_name, 'w') as f:
-        f.write(controller_name + ':\n')
+        f.write(robot_name + ':\n')
         # joint_state_controller
         f.write('  # Publish all joint states -----------------------------------\n')
         f.write('  joint_state_controller:\n')
         f.write('    type: joint_state_controller/JointStateController\n')  
         f.write('    publish_rate: 50\n\n')
-        # position_controllers
+
+        # Position_controllers
         f.write('  # Position Controllers --------------------------------------\n')
         for joint in joints_dict:
             joint_type = joints_dict[joint]['type']
             if joint_type != 'fixed':
                 f.write('  ' + joint + '_position_controller:\n')
-                f.write('    type: effort_controllers/JointPositionController\n')
+                f.write('    type: position_controllers/JointPositionController\n')
                 f.write('    joint: '+ joint + '\n')
                 f.write('    pid: {p: 100.0, i: 0.01, d: 10.0}\n')
+        f.write('\n')
+        # Effort_controllers
+        f.write('  # Effort Controllers --------------------------------------\n')
+        for joint in joints_dict:
+            joint_type = joints_dict[joint]['type']
+            if joint_type != 'fixed':
+                f.write('  ' + joint + '_effort_controller:\n')
+                f.write('    type: effort_controllers/JointEffortController\n')
+                f.write('    joint: '+ joint + '\n')
+        f.write('\n')
 
