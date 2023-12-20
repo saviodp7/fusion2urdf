@@ -223,7 +223,7 @@ def write_gazebo_xacro(joints_dict, links_xyz_dict, inertial_dict, package_name,
         f.write('<?xml version="1.0" ?>\n')
         f.write('<robot name="{}" xmlns:xacro="http://www.ros.org/wiki/xacro" >\n'.format(robot_name))
         f.write('\n')
-        f.write('<xacro:property name="body_color" value="Gazebo/Silver" />\n')
+        f.write('<xacro:property name="body_color" value="Gazebo/DarkGrey" />\n')
         f.write('\n')
 
         gazebo = Element('gazebo')

@@ -177,8 +177,8 @@ def make_joints_dict(root, msg):
         if joint.occurrenceTwo.component.name == 'base_link':
             joint_dict['parent'] = 'base_link'
         else:
-            joint_dict['parent'] = str(re.sub('[ :()]', '_', joint.occurrenceTwo.name)[:-2])
-        joint_dict['child'] = str(re.sub('[ :()]', '_', joint.occurrenceOne.name)[:-2])
+            joint_dict['parent'] = str(re.sub(r':(\d+)$', '', joint.occurrenceTwo.name))
+        joint_dict['child'] = str(re.sub(r':(\d+)$', '', joint.occurrenceOne.name))
         
         
         #There seem to be a problem with geometryOrOriginTwo. To calcualte the correct orogin of the generated stl files following approach was used.
